@@ -265,7 +265,7 @@ export default function KnowledgeBasePage() {
               {activeDoc ? (
                 activeDoc.type === 'pdf' ? (
                   <iframe
-                    src={`http://localhost:8000/api/uploads/${activeDoc.id}${activeDoc.name.substring(activeDoc.name.lastIndexOf('.'))}`}
+                    src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/document/file/${activeDoc.id}`}
                     className="absolute inset-0 w-full h-full border-none"
                     title="Document Preview"
                   />
@@ -275,7 +275,7 @@ export default function KnowledgeBasePage() {
                   </div>
                 ) : (
                   <iframe
-                    src={`http://localhost:8000/api/uploads/${activeDoc.id}${activeDoc.name.substring(activeDoc.name.lastIndexOf('.'))}`}
+                    src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/document/file/${activeDoc.id}`}
                     className="absolute inset-0 w-full h-full border-none"
                     title="Document Preview"
                   />

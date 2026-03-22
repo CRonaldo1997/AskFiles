@@ -106,12 +106,14 @@ export default function ChatPage() {
       const savedModel = localStorage.getItem('askfiles_model_id');
       if (!savedModel && modelList.length > 0) setSelectedModelId(modelList[0].id);
 
-      const readyDocs = docList.filter(d => d.status === 'done');
-      setDocuments(readyDocs);
+      // Include files that are ready (done) or being processed (uploaded/running)
+      const visibleDocs = docList.filter(d => ['done', 'uploaded', 'running'].includes(d.status));
+      setDocuments(visibleDocs);
 
       const savedDoc = localStorage.getItem('askfiles_doc_id');
       // Only set default if nothing was saved
-      if (!savedDoc && readyDocs.length > 0) setSelectedDocId(readyDocs[0].id);
+      // Only set default if nothing was saved
+      if (!savedDoc && visibleDocs.length > 0) setSelectedDocId(visibleDocs[0].id);
 
       // Load System Prompt from Backend (Survives Restarts)
       const promptRes = await fetch('http://localhost:8000/api/settings/system_prompt').then(r => r.json()).catch(() => ({}));
@@ -438,7 +440,9 @@ export default function ChatPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[11px] font-bold truncate">{doc.name}</p>
-                    <p className="text-[9px] text-on-surface-variant/60 capitalize">{doc.type}</p>
+                    <p className={`text-[9px] capitalize ${doc.status === 'done' ? 'text-on-surface-variant/60' : 'text-primary'}`}>
+                      {doc.status === 'done' ? doc.type : (doc.status === 'uploaded' ? '待OCR' : '正在解析')}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -539,7 +543,7 @@ export default function ChatPage() {
             {selectedDocId ? (
               documents.find(d => d.id === selectedDocId)?.type === 'pdf' ? (
                 <iframe
-                  src={`http://localhost:8000/api/uploads/${selectedDocId}${documents.find(d => d.id === selectedDocId)?.name?.includes('.') ? documents.find(d => d.id === selectedDocId)!.name.substring(documents.find(d => d.id === selectedDocId)!.name.lastIndexOf('.')) : ''}`}
+                  src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/document/file/${selectedDocId}`}
                   className="absolute inset-0 w-full h-full border-none"
                   title="Document Preview"
                 />

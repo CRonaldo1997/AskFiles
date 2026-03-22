@@ -1,16 +1,17 @@
 import os
 import io
 import asyncio
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File, Response
+from fastapi.responses import StreamingResponse
 from typing import List
 from app.schemas.document import DocumentResponse, DocumentUpdate
 from app.db.supabase import supabase
 from app.services.ocr_service import ocr_service
+from app.core.config import settings
 
 router = APIRouter()
 
-UPLOAD_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../uploads"))
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+
 
 ALLOWED_MIME_TYPES = [
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -99,7 +100,7 @@ async def upload_document(file: UploadFile = File(...)):
     
     doc_id = db_response.data[0]["id"]
     
-    # 2. Save the file locally for frontend preview
+    # 2. Save the file to Supabase Storage
     ext = os.path.splitext(file.filename)[1]
     if not ext:
         if "pdf" in file.content_type: ext = ".pdf"
@@ -108,12 +109,18 @@ async def upload_document(file: UploadFile = File(...)):
         elif "word" in file.content_type: ext = ".docx"
         else: ext = ".txt"
         
-    file_path = os.path.join(UPLOAD_DIR, f"{doc_id}{ext}")
+    storage_path = f"{doc_id}{ext}"
     try:
-        with open(file_path, "wb") as f:
-            f.write(file_bytes)
+        supabase.storage.from_(settings.SUPABASE_STORAGE_BUCKET).upload(
+            storage_path, 
+            file_bytes, 
+            {"content-type": file.content_type}
+        )
     except Exception as e:
-        print(f"Failed to save file locally: {e}")
+        print(f"Failed to save file to Supabase Storage: {e}")
+        # Rollback db insert if possible or mark as failed
+        supabase.table("documents").delete().eq("id", doc_id).execute()
+        raise HTTPException(status_code=500, detail=f"文件存储失败: {str(e)}")
 
     # 3. Process based on file type
     if file.content_type in DIRECT_TYPES:
@@ -157,19 +164,18 @@ async def trigger_ocr(doc_id: str):
     if file_type not in OCR_TYPES:
         raise HTTPException(status_code=400, detail="该文件类型不需要OCR")
     
-    # 2. Read the saved file
+    # 2. Read the file from Supabase Storage
     ext = os.path.splitext(doc["file_name"])[1]
     if not ext:
         if "pdf" in file_type: ext = ".pdf"
         elif "png" in file_type: ext = ".png"
         elif "jpeg" in file_type or "jpg" in file_type: ext = ".jpg"
     
-    file_path = os.path.join(UPLOAD_DIR, f"{doc_id}{ext}")
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="本地文件未找到，请重新上传")
-    
-    with open(file_path, "rb") as f:
-        file_bytes = f.read()
+    storage_path = f"{doc_id}{ext}"
+    try:
+        file_bytes = supabase.storage.from_(settings.SUPABASE_STORAGE_BUCKET).download(storage_path)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"存储库中未找到文件: {str(e)}")
     
     # 3. Update status to running
     supabase.table("documents").update({"status": "running"}).eq("id", doc_id).execute()
@@ -224,13 +230,39 @@ def delete_document(doc_id: str):
         print(f"Error deleting document {doc_id}: {e}")
         raise HTTPException(status_code=500, detail=f"删除失败: {str(e)}")
     
-    # 3. Clean up physical file
+    # 3. Clean up storage file
     for ext in ['.pdf', '.png', '.jpg', '.jpeg', '.docx', '.txt']:
-        file_path = os.path.join(UPLOAD_DIR, f"{doc_id}{ext}")
-        if os.path.exists(file_path):
-            try:
-                os.remove(file_path)
-            except Exception as e:
-                print(f"Warning: Failed to delete file {file_path}: {e}")
+        storage_path = f"{doc_id}{ext}"
+        try:
+            # remove() takes a list of paths
+            supabase.storage.from_(settings.SUPABASE_STORAGE_BUCKET).remove([storage_path])
+        except Exception:
+            pass
                 
     return {"message": "文档删除成功"}
+    
+
+@router.get("/file/{doc_id}")
+async def get_document_file(doc_id: str):
+    """Fetch the document file from Supabase Storage."""
+    # 1. Get document info to find full filename/type
+    doc_res = supabase.table("documents").select("*").eq("id", doc_id).execute()
+    if not doc_res.data:
+        raise HTTPException(status_code=404, detail="文档未找到")
+    
+    doc = doc_res.data[0]
+    file_type = doc["file_type"]
+    ext = os.path.splitext(doc["file_name"])[1]
+    if not ext:
+        if "pdf" in file_type: ext = ".pdf"
+        elif "png" in file_type: ext = ".png"
+        elif "jpeg" in file_type or "jpg" in file_type: ext = ".jpg"
+        elif "word" in file_type: ext = ".docx"
+        else: ext = ".txt"
+        
+    storage_path = f"{doc_id}{ext}"
+    try:
+        file_bytes = supabase.storage.from_(settings.SUPABASE_STORAGE_BUCKET).download(storage_path)
+        return StreamingResponse(io.BytesIO(file_bytes), media_type=file_type)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"文件不存在: {str(e)}")

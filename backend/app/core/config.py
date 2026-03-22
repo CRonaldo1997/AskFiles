@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     # Supabase config
     SUPABASE_URL: str = Field(..., env='SUPABASE_URL')
     SUPABASE_KEY: str = Field(..., env='SUPABASE_KEY')
+    SUPABASE_STORAGE_BUCKET: str = "documents"
     
     # PaddleOCR config
     PADDLE_OCR_API_URL: str = "https://paddleocr.aistudio-app.com/api/v2/ocr/jobs"

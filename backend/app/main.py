@@ -22,11 +22,8 @@ def root():
 
 from app.api.endpoints import model, document, ocr, chat, settings as api_settings, auth
 import os
-from fastapi.staticfiles import StaticFiles
 
-UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-app.mount("/api/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+
 
 app.include_router(model.router, prefix="/api/model", tags=["model"])
 app.include_router(document.router, prefix="/api/document", tags=["document"])
