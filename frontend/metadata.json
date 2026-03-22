@@ -1,0 +1,5 @@
+{
+  "name": "文档问答助手",
+  "description": "A document QA assistant with knowledge base management, model configuration, and user authentication.",
+  "requestFramePermissions": []
+}

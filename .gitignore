@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+.venv/
+.conda/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Next.js
+.next/
+out/
+build/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+
+# Sensitive Information
+.env
+.env.local
+.env.*.local
+*.json (except those needed for config)
+data/
+backend/data/
+frontend/data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Git
+.git/
