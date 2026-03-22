@@ -96,6 +96,32 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 *(你可以将系统截图放置于此处)*
 
+## 🌐 部署指南 (Deployment)
+
+本项目推荐采用 **前后端分离部署** 的模式：
+
+### 1. 后端 (Render)
+- **平台**: [Render.com](https://render.com) (Web Service)
+- **Root Directory**: `backend`
+- **Build Command**: `pip install -r requirements.txt`
+- **Start Command**: `gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:$PORT`
+- **环境变量**:
+  - `SUPABASE_URL`: 你的 Supabase 项目 URL
+  - `SUPABASE_KEY`: 你的 Supabase Service Role Key (或 Anon Key)
+  - `PADDLE_OCR_TOKEN`: 你的 OCR API 访问令牌
+
+### 2. 前端 (Vercel)
+- **平台**: [Vercel](https://vercel.com)
+- **Root Directory**: `frontend`
+- **Framework Preset**: `Next.js`
+- **环境变量**:
+  - `NEXT_PUBLIC_API_URL`: 你在 Render 部署后的后端地址 (如 `https://xxx.onrender.com`)
+
+### 3. 数据库 (Supabase)
+请确保在 Supabase 中创建了以下表：
+- `documents`: 存储文件元数据、状态及解析后的 OCR 内容。
+- `chats`: 存储对话历史。
+
 ---
 
 ## 📄 开源协议
