@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Sparkles, Send, Settings2, Trash2, MessageSquare, Loader2, X, Cpu, FileText, Plus, Clock, Edit2 } from 'lucide-react';
+import { Sparkles, Send, Settings2, Trash2, MessageSquare, Loader2, X, Cpu, FileText, Plus, Clock, Edit2, Search } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import remarkGfm from 'remark-gfm';
@@ -50,6 +50,7 @@ export default function ChatPage() {
 
   const isInitialMount = useRef(true);
   const isManualLoad = useRef(false);
+  const [docSearchQuery, setDocSearchQuery] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   // Load from localStorage on Mount safely
@@ -426,30 +427,53 @@ export default function ChatPage() {
               </h2>
               <div className="px-2 py-0.5 bg-primary/20 text-primary text-[10px] rounded-full font-bold">{documents.length}</div>
             </div>
+            <div className="p-3 border-b border-white/5">
+              <div className="relative group">
+                <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 transition-colors ${docSearchQuery ? 'text-primary' : 'text-on-surface-variant/40'}`} />
+                <input
+                  type="text"
+                  value={docSearchQuery}
+                  onChange={(e) => setDocSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 bg-black/20 border border-white/10 rounded-xl text-[10px] outline-none placeholder:text-on-surface-variant/30 focus:border-primary/50 transition-all font-medium"
+                  placeholder="搜索文档名称/内容..."
+                />
+              </div>
+            </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
-              {documents.length === 0 ? (
-                <div className="text-center py-10 text-[10px] text-on-surface-variant/40 italic">暂无文档</div>
-              ) : documents.map((doc) => (
-                <div
-                  key={doc.id}
-                  onClick={() => {
-                    isManualLoad.current = true;
-                    setSelectedDocId(doc.id);
-                    setCurrentSessionId('');
-                  }}
-                  className={`group flex items-center gap-3 p-3 rounded-xl cursor-pointer border transition-all ${doc.id === selectedDocId ? 'bg-primary/20 border-primary/50' : 'bg-white/5 border-transparent hover:bg-white/10'}`}
-                >
-                  <div className={`w-8 h-8 flex items-center justify-center rounded-lg ${doc.id === selectedDocId ? 'bg-primary text-white' : 'bg-black/20 text-on-surface-variant'}`}>
-                    <FileText className="w-4 h-4" />
+              {(() => {
+                const filteredDocs = documents.filter(doc =>
+                  doc.name.toLowerCase().includes(docSearchQuery.toLowerCase()) ||
+                  (doc.ocr_content && doc.ocr_content.toLowerCase().includes(docSearchQuery.toLowerCase()))
+                );
+
+                if (filteredDocs.length === 0) {
+                  return <div className="text-center py-10 text-[10px] text-on-surface-variant/40 italic">
+                    {docSearchQuery ? '未找到相关文档' : '暂无文档'}
+                  </div>;
+                }
+
+                return filteredDocs.map((doc) => (
+                  <div
+                    key={doc.id}
+                    onClick={() => {
+                      isManualLoad.current = true;
+                      setSelectedDocId(doc.id);
+                      setCurrentSessionId('');
+                    }}
+                    className={`group flex items-center gap-3 p-3 rounded-xl cursor-pointer border transition-all ${doc.id === selectedDocId ? 'bg-primary/20 border-primary/50' : 'bg-white/5 border-transparent hover:bg-white/10'}`}
+                  >
+                    <div className={`w-8 h-8 flex items-center justify-center rounded-lg ${doc.id === selectedDocId ? 'bg-primary text-white' : 'bg-black/20 text-on-surface-variant'}`}>
+                      <FileText className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-bold truncate">{doc.name}</p>
+                      <p className={`text-[9px] capitalize ${doc.status === 'done' ? 'text-on-surface-variant/60' : 'text-primary'}`}>
+                        {doc.status === 'done' ? doc.type : (doc.status === 'uploaded' ? '待OCR' : '正在解析')}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-bold truncate">{doc.name}</p>
-                    <p className={`text-[9px] capitalize ${doc.status === 'done' ? 'text-on-surface-variant/60' : 'text-primary'}`}>
-                      {doc.status === 'done' ? doc.type : (doc.status === 'uploaded' ? '待OCR' : '正在解析')}
-                    </p>
-                  </div>
-                </div>
-              ))}
+                ));
+              })()}
             </div>
           </div>
 

@@ -128,7 +128,8 @@ export default function KnowledgeBasePage() {
   };
 
   const filteredDocs = documents.filter(doc =>
-    doc.name.toLowerCase().includes(searchQuery.toLowerCase())
+    doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (doc.ocr_content && doc.ocr_content.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const activeDoc = documents.find(d => d.id === activeDocId);
