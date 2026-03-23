@@ -171,6 +171,47 @@
     margin-bottom: 0.25rem;
     display: list-item !important;
   }
+
+  .prose table {
+    width: 100%;
+    margin: 1.5rem 0;
+    border-collapse: collapse;
+    border: 1px solid var(--outline-variant);
+    font-size: 0.875rem;
+    border-radius: 0.5rem;
+    overflow: hidden;
+  }
+
+  .prose thead {
+    background-color: var(--surface-dim);
+    border-bottom: 2px solid var(--outline);
+  }
+
+  .prose th {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-weight: 700;
+    color: var(--on-surface) !important;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.75rem;
+    border: 1px solid var(--outline-variant);
+  }
+
+  .prose td {
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--outline-variant);
+    color: var(--on-surface-variant) !important;
+    line-height: 1.5;
+  }
+
+  .prose tr:nth-child(even) {
+    background-color: rgba(255, 255, 255, 0.02);
+  }
+
+  .prose tr:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
 }
 
 ::selection {

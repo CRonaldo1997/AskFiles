@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Search, Upload, FileText, FileSpreadsheet, FileIcon, Copy, Save, Trash2, Loader2, Eye, FileImage, ScanLine } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useRouter } from 'next/navigation';
-import { apiService, Document } from '@/lib/api';
+import { apiService, Document, API_BASE_URL } from '@/lib/api';
 
 export default function KnowledgeBasePage() {
   const router = useRouter();
@@ -265,7 +265,7 @@ export default function KnowledgeBasePage() {
               {activeDoc ? (
                 activeDoc.type === 'pdf' ? (
                   <iframe
-                    src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/document/file/${activeDoc.id}`}
+                    src={`${API_BASE_URL}/api/document/file/${activeDoc.id}`}
                     className="absolute inset-0 w-full h-full border-none"
                     title="Document Preview"
                   />
@@ -275,7 +275,7 @@ export default function KnowledgeBasePage() {
                   </div>
                 ) : (
                   <iframe
-                    src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/document/file/${activeDoc.id}`}
+                    src={`${API_BASE_URL}/api/document/file/${activeDoc.id}`}
                     className="absolute inset-0 w-full h-full border-none"
                     title="Document Preview"
                   />

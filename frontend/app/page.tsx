@@ -4,11 +4,12 @@ import { useState, useRef, useEffect } from 'react';
 import { Sparkles, Send, Settings2, Trash2, MessageSquare, Loader2, X, Cpu, FileText, Plus, Clock, Edit2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
+import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { motion, AnimatePresence } from 'motion/react';
 import { useRouter } from 'next/navigation';
-import { apiService, ModelConfig, Document, ChatSession, ChatRequest } from '@/lib/api';
+import { apiService, ModelConfig, Document, ChatSession, ChatRequest, API_BASE_URL } from '@/lib/api';
 
 type Message = {
   id: string;
@@ -45,6 +46,7 @@ export default function ChatPage() {
 
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [tempTitle, setTempTitle] = useState('');
+  const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
 
   const isInitialMount = useRef(true);
   const isManualLoad = useRef(false);
@@ -116,7 +118,7 @@ export default function ChatPage() {
       if (!savedDoc && visibleDocs.length > 0) setSelectedDocId(visibleDocs[0].id);
 
       // Load System Prompt from Backend (Survives Restarts)
-      const promptRes = await fetch('http://localhost:8000/api/settings/system_prompt').then(r => r.json()).catch(() => ({}));
+      const promptRes = await fetch(`${API_BASE_URL}/api/settings/system_prompt`).then(r => r.json()).catch(() => ({}));
       if (promptRes.value) {
         setSystemPrompt(promptRes.value);
         setTempSystemPrompt(promptRes.value);
@@ -190,16 +192,18 @@ export default function ChatPage() {
     setCurrentSessionId(s.id);
   };
 
-  const handleDeleteSession = async (sessionId: string) => {
-    if (!confirm('确定要删除这段对话吗？')) return;
+  const handleConfirmDelete = async () => {
+    if (!sessionToDelete) return;
     try {
-      await apiService.deleteSession(sessionId);
-      setSessions(prev => prev.filter(s => s.id !== sessionId));
-      if (currentSessionId === sessionId) {
+      await apiService.deleteSession(sessionToDelete);
+      setSessions(prev => prev.filter(s => s.id !== sessionToDelete));
+      if (currentSessionId === sessionToDelete) {
         handleNewChat();
       }
+      setSessionToDelete(null);
     } catch (err: any) {
       alert(`删除失败: ${err.message}`);
+      setSessionToDelete(null);
     }
   };
 
@@ -363,7 +367,7 @@ export default function ChatPage() {
 
   const confirmClear = async () => {
     try {
-      await fetch('http://localhost:8000/api/chat/clear', {
+      await fetch(`${API_BASE_URL}/api/chat/clear`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ doc_id: selectedDocId || null, username: username, session_id: currentSessionId || undefined })
@@ -394,7 +398,7 @@ export default function ChatPage() {
       localStorage.setItem('askfiles_system_prompt', tempSystemPrompt);
 
       // Save to Backend for persistence across restarts
-      await fetch('http://localhost:8000/api/settings/system_prompt', {
+      await fetch(`${API_BASE_URL}/api/settings/system_prompt`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ value: tempSystemPrompt })
@@ -517,7 +521,7 @@ export default function ChatPage() {
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={(e) => { e.stopPropagation(); handleDeleteSession(s.id); }}
+                      onClick={(e) => { e.stopPropagation(); setSessionToDelete(s.id); }}
                       className="p-1.5 hover:bg-red-500/20 hover:text-red-400 rounded-lg transition-all text-on-surface-variant/40"
                       title="删除对话"
                     >
@@ -541,21 +545,40 @@ export default function ChatPage() {
           </div>
           <div className="flex-1 bg-black/40 relative">
             {selectedDocId ? (
-              documents.find(d => d.id === selectedDocId)?.type === 'pdf' ? (
-                <iframe
-                  src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/document/file/${selectedDocId}`}
-                  className="absolute inset-0 w-full h-full border-none"
-                  title="Document Preview"
-                />
-              ) : (
-                <div className="absolute inset-0 p-6 overflow-y-auto custom-scrollbar">
-                  <div className="prose prose-sm max-w-none">
-                    <pre className="text-[12px] leading-relaxed whitespace-pre-wrap font-mono text-on-surface-variant/80">
-                      {documents.find(d => d.id === selectedDocId)?.ocr_content || '文档内容正在加载中或为空...'}
-                    </pre>
-                  </div>
-                </div>
-              )
+              (() => {
+                const doc = documents.find(d => d.id === selectedDocId);
+                if (!doc) return null;
+
+                if (doc.type === 'pdf' || doc.type === 'txt') {
+                  return (
+                    <iframe
+                      src={`${API_BASE_URL}/api/document/file/${selectedDocId}`}
+                      className="absolute inset-0 w-full h-full border-none bg-white"
+                      title="Document Preview"
+                    />
+                  );
+                } else if (doc.type === 'image') {
+                  return (
+                    <div className="absolute inset-0 flex items-center justify-center p-6 bg-black/20 overflow-auto">
+                      <img
+                        src={`${API_BASE_URL}/api/document/file/${selectedDocId}`}
+                        alt="Document Preview"
+                        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                      />
+                    </div>
+                  );
+                } else {
+                  return (
+                    <div className="absolute inset-0 p-6 overflow-y-auto custom-scrollbar">
+                      <div className="prose prose-sm max-w-none">
+                        <pre className="text-[12px] leading-relaxed whitespace-pre-wrap font-mono text-on-surface-variant/80">
+                          {doc.ocr_content || '文档内容正在加载中或为空...'}
+                        </pre>
+                      </div>
+                    </div>
+                  );
+                }
+              })()
             ) : (
               <div className="h-full flex flex-col items-center justify-center p-10 text-on-surface-variant/40 italic text-sm">
                 <MessageSquare className="w-12 h-12 mb-4 opacity-10" />
@@ -613,7 +636,12 @@ export default function ChatPage() {
                       </div>
                     ) : (
                       <div className="prose prose-sm max-w-none prose-p:leading-relaxed">
-                        <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{msg.content}</ReactMarkdown>
+                        <ReactMarkdown
+                          remarkPlugins={[remarkMath, remarkGfm]}
+                          rehypePlugins={[rehypeKatex]}
+                        >
+                          {msg.content.replace(/\|\|\|/g, '\n')}
+                        </ReactMarkdown>
                       </div>
                     )}
                   </div>
@@ -707,6 +735,38 @@ export default function ChatPage() {
                 <button onClick={confirmClear} className="flex-1 py-2.5 rounded-xl bg-error text-white text-sm font-semibold hover:bg-opacity-90 transition-all shadow-lg shadow-error/20">确定清空</button>
               </div>
             </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {sessionToDelete && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-on-surface/20 dark:bg-black/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="w-full max-w-sm rounded-2xl shadow-2xl p-6 bg-surface border border-outline-variant relative"
+            >
+              <div className="w-12 h-12 rounded-full bg-error/10 flex items-center justify-center text-error mb-4 mx-auto">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-center mb-2">删除这段对话？</h3>
+              <p className="text-sm text-on-surface-variant text-center mb-6">确定要删除这段对话内容吗？此操作不可撤销。</p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setSessionToDelete(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-outline-variant hover:bg-surface-dim text-sm font-semibold transition-all text-on-surface"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleConfirmDelete}
+                  className="flex-1 py-2.5 rounded-xl bg-error text-white text-sm font-semibold hover:bg-opacity-90 transition-all shadow-lg shadow-error/20"
+                >
+                  确定删除
+                </button>
+              </div>
+            </motion.div>
           </div>
         )}
       </AnimatePresence>

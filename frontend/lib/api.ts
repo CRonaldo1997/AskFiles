@@ -46,7 +46,9 @@ export interface ChatRequest {
   user_prompt?: string;
 }
 
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000') + '/api';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_V1_URL = `${API_BASE_URL}/api`;
+
 
 const formatSize = (bytes: number) => {
   if (bytes < 1024) return `${bytes} B`;
@@ -65,7 +67,7 @@ const mapDocType = (mime: string): 'pdf' | 'csv' | 'docx' | 'txt' | 'image' => {
 export const apiService = {
   // Documents
   getDocuments: async (): Promise<Document[]> => {
-    const res = await fetch(`${API_BASE_URL}/document/list`);
+    const res = await fetch(`${API_V1_URL}/document/list`);
     const data = await res.json();
     return data.map((d: any) => ({
       id: d.id,
@@ -82,7 +84,7 @@ export const apiService = {
   uploadDocument: async (file: File): Promise<Document> => {
     const formData = new FormData();
     formData.append('file', file);
-    const res = await fetch(`${API_BASE_URL}/document/upload`, {
+    const res = await fetch(`${API_V1_URL}/document/upload`, {
       method: 'POST',
       body: formData
     });
@@ -99,7 +101,7 @@ export const apiService = {
   },
 
   checkOcrStatus: async (jobId: string): Promise<Document> => {
-    const res = await fetch(`${API_BASE_URL}/ocr/status/${jobId}`);
+    const res = await fetch(`${API_V1_URL}/ocr/status/${jobId}`);
     const d = await res.json();
     return {
       id: d.id,
@@ -114,7 +116,7 @@ export const apiService = {
   },
 
   deleteDocument: async (id: string) => {
-    const res = await fetch(`${API_BASE_URL}/document/${id}`, { method: 'DELETE' });
+    const res = await fetch(`${API_V1_URL}/document/${id}`, { method: 'DELETE' });
     if (!res.ok) {
       const errData = await res.json().catch(() => ({ detail: res.statusText }));
       throw new Error(errData.detail || `Delete failed: ${res.status}`);
@@ -123,7 +125,7 @@ export const apiService = {
   },
 
   triggerOCR: async (docId: string): Promise<Document> => {
-    const res = await fetch(`${API_BASE_URL}/document/ocr/${docId}`, { method: 'POST' });
+    const res = await fetch(`${API_V1_URL}/document/ocr/${docId}`, { method: 'POST' });
     if (!res.ok) {
       const errData = await res.json().catch(() => ({ detail: res.statusText }));
       throw new Error(errData.detail || `OCR failed: ${res.status}`);
@@ -142,7 +144,7 @@ export const apiService = {
   },
 
   updateDocumentContent: async (docId: string, ocr_content: string): Promise<Document> => {
-    const res = await fetch(`${API_BASE_URL}/document/${docId}`, {
+    const res = await fetch(`${API_V1_URL}/document/${docId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ocr_content })
@@ -163,13 +165,13 @@ export const apiService = {
 
   // Models
   getModels: async (): Promise<ModelConfig[]> => {
-    const res = await fetch(`${API_BASE_URL}/model/list`);
+    const res = await fetch(`${API_V1_URL}/model/list`);
     return await res.json();
   },
 
   // Chat
   sendMessage: async (request: ChatRequest): Promise<any> => {
-    const res = await fetch(`${API_BASE_URL}/chat/ask`, {
+    const res = await fetch(`${API_V1_URL}/chat/ask`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(request)
@@ -178,7 +180,7 @@ export const apiService = {
   },
 
   getChatHistory: async (doc_id: string | undefined, username: string, sessionId?: string): Promise<ChatMessage[]> => {
-    let url = `${API_BASE_URL}/chat/list?username=${encodeURIComponent(username)}`;
+    let url = `${API_V1_URL}/chat/list?username=${encodeURIComponent(username)}`;
     if (doc_id) {
       url += `&doc_id=${doc_id}`;
     }
@@ -198,7 +200,7 @@ export const apiService = {
   },
 
   streamMessage: async (request: ChatRequest, signal?: AbortSignal): Promise<Response> => {
-    return await fetch(`${API_BASE_URL}/chat/ask/stream`, {
+    return await fetch(`${API_V1_URL}/chat/ask/stream`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(request),
@@ -208,7 +210,7 @@ export const apiService = {
 
   // Auth
   login: async (username: string, password: string) => {
-    const res = await fetch(`${API_BASE_URL}/auth/login`, {
+    const res = await fetch(`${API_V1_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })
@@ -221,7 +223,7 @@ export const apiService = {
   },
 
   register: async (username: string, password: string) => {
-    const res = await fetch(`${API_BASE_URL}/auth/register`, {
+    const res = await fetch(`${API_V1_URL}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })
@@ -235,14 +237,14 @@ export const apiService = {
 
   // Sessions Management
   listSessions: async (username: string, docId?: string): Promise<ChatSession[]> => {
-    let url = `${API_BASE_URL}/chat/sessions?username=${encodeURIComponent(username)}`;
+    let url = `${API_V1_URL}/chat/sessions?username=${encodeURIComponent(username)}`;
     if (docId) url += `&doc_id=${docId}`;
     const res = await fetch(url);
     return await res.json();
   },
 
   createSession: async (session: { title: string; username: string; doc_id?: string }): Promise<ChatSession> => {
-    const res = await fetch(`${API_BASE_URL}/chat/sessions`, {
+    const res = await fetch(`${API_V1_URL}/chat/sessions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(session)
@@ -251,7 +253,7 @@ export const apiService = {
   },
 
   updateSession: async (sessionId: string, title: string): Promise<ChatSession> => {
-    const res = await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}`, {
+    const res = await fetch(`${API_V1_URL}/chat/sessions/${sessionId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title })
@@ -260,7 +262,7 @@ export const apiService = {
   },
 
   deleteSession: async (sessionId: string): Promise<any> => {
-    const res = await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}`, { method: 'DELETE' });
+    const res = await fetch(`${API_V1_URL}/chat/sessions/${sessionId}`, { method: 'DELETE' });
     return await res.json();
   }
 };

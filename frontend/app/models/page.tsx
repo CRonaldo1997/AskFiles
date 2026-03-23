@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Cpu, Plus, Edit2, Trash2, Key, Loader2, ShieldCheck, Activity, CheckCircle2, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { apiService, ModelConfig } from '@/lib/api';
+import { apiService, ModelConfig, API_BASE_URL } from '@/lib/api';
 
 export default function ModelsPage() {
   const [models, setModels] = useState<ModelConfig[]>([]);
@@ -36,13 +36,13 @@ export default function ModelsPage() {
       let res;
       if (modelId) {
         // Test existing
-        res = await fetch(`http://localhost:8000/api/model/test/${modelId}`, { method: 'POST' });
+        res = await fetch(`${API_BASE_URL}/api/model/test/${modelId}`, { method: 'POST' });
       } else {
         // Test current form
         if (!formData.name || !formData.url || (!formData.api_key && !editingModel)) {
           throw new Error("请先填写完整配置（包括 API Key）以便测试");
         }
-        res = await fetch('http://localhost:8000/api/model/test', {
+        res = await fetch(`${API_BASE_URL}/api/model/test`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData)
@@ -81,7 +81,7 @@ export default function ModelsPage() {
     try {
       if (editingModel) {
         // Update
-        const res = await fetch(`http://localhost:8000/api/model/${editingModel.id}`, {
+        const res = await fetch(`${API_BASE_URL}/api/model/${editingModel.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData)
@@ -89,7 +89,7 @@ export default function ModelsPage() {
         if (!res.ok) throw new Error("Update failed");
       } else {
         // Create
-        const res = await fetch('http://localhost:8000/api/model/add', {
+        const res = await fetch(`${API_BASE_URL}/api/model/add`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData)
@@ -105,7 +105,7 @@ export default function ModelsPage() {
 
   const handleDelete = async (id: string) => {
     if (confirm("确定删除吗？")) {
-      await fetch(`http://localhost:8000/api/model/${id}`, { method: 'DELETE' });
+      await fetch(`${API_BASE_URL}/api/model/${id}`, { method: 'DELETE' });
       fetchModels();
     }
   };
