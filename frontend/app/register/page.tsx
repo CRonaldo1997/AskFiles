@@ -30,6 +30,7 @@ export default function RegisterPage() {
 
     try {
       await apiService.register(formData.username, formData.password);
+      alert('注册成功，欢迎开启 AI 问答之旅！请点击确定返回登录页面。');
       router.push('/login');
     } catch (err: any) {
       setError(err.message || '注册失败，请稍后重试');

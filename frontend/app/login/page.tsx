@@ -10,6 +10,7 @@ import { apiService } from '@/lib/api';
 export default function LoginPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -17,6 +18,7 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     setIsLoading(true);
 
     try {
@@ -24,7 +26,7 @@ export default function LoginPage() {
       localStorage.setItem('askfiles_username', formData.username);
       router.push('/');
     } catch (err: any) {
-      alert(err.message || '登录失败，请检查用户名或密码');
+      setError(err.message || '登录失败，请检查用户名或密码');
     } finally {
       setIsLoading(false);
     }
@@ -91,6 +93,16 @@ export default function LoginPage() {
                 placeholder="请输入密码"
               />
             </div>
+
+            {error && (
+              <motion.p
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="text-red-400 text-sm font-medium text-center"
+              >
+                {error}
+              </motion.p>
+            )}
 
             <button
               type="submit"
