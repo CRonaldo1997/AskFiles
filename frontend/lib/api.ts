@@ -236,9 +236,10 @@ export const apiService = {
   },
 
   // Sessions Management
-  listSessions: async (username: string, docId?: string): Promise<ChatSession[]> => {
+  listSessions: async (username: string, docId?: string, q?: string): Promise<ChatSession[]> => {
     let url = `${API_V1_URL}/chat/sessions?username=${encodeURIComponent(username)}`;
     if (docId) url += `&doc_id=${docId}`;
+    if (q) url += `&q=${encodeURIComponent(q)}`;
     const res = await fetch(url);
     return await res.json();
   },

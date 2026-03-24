@@ -29,11 +29,13 @@ async def ask_question_stream(chat_in: ChatRequest):
             if document.get("status") == "done" and document.get("ocr_content"):
                 ocr_context = document["ocr_content"]
 
-    # 3. 构造当前 Prompt
-    user_prompt = chat_in.user_prompt or "请看以下文档内容并回答问题：\n\n{context}\n\n问题：{question}"
-    final_user_content = user_prompt.replace("{context}", ocr_context).replace("{question}", chat_in.question)
-    system_prompt = chat_in.system_prompt or "你是一个智能问答助手，请基于提供的文档内容回答用户问题。"
-    print(f"DEBUG: context length={len(ocr_context)}, system_prompt={system_prompt}")
+    # 3. 构造系统提示词 (注入文档内容作为背景)
+    system_prompt = chat_in.system_prompt or "你是一个专业的智能文档助手，请用专业、准确、友好的语气回答用户的问题。"
+    if ocr_context:
+        system_prompt = f"{system_prompt}\n\n【参考文档全文开始】\n{ocr_context}\n【参考文档全文结束】\n\n请在回答时严格参考上述文档内容。"
+    
+    final_user_content = chat_in.question
+    print(f"DEBUG: context length={len(ocr_context)}, system_prompt_len={len(system_prompt)}")
     
     # 4. 获取历史上下文 (最近20条)
     history_messages = []
@@ -135,10 +137,12 @@ async def ask_question(chat_in: ChatRequest):
             raise HTTPException(status_code=400, detail="文档 OCR 尚未完成或内容为空")
         ocr_context = document["ocr_content"]
 
-    # 3. 构造当前 Prompt
-    user_prompt = chat_in.user_prompt or "请看以下文档内容并回答问题：\n\n{context}\n\n问题：{question}"
-    final_user_content = user_prompt.replace("{context}", ocr_context).replace("{question}", chat_in.question)
-    system_prompt = chat_in.system_prompt or "你是一个智能问答助手，请基于提供的文档内容回答用户问题。"
+    # 3. 构造系统提示词 (注入文档内容作为背景)
+    system_prompt = chat_in.system_prompt or "你是一个专业的智能文档助手，请用专业、准确、友好的语气回答用户的问题。"
+    if ocr_context:
+        system_prompt = f"{system_prompt}\n\n【参考文档全文开始】\n{ocr_context}\n【参考文档全文结束】\n\n请在回答时严格参考上述文档内容。"
+    
+    final_user_content = chat_in.question
     full_prompt_record = f"System: {system_prompt}\nUser: {final_user_content}"
     
     # 4. 获取历史上下文 (最近20条)
@@ -263,15 +267,48 @@ def clear_chat_history(req: ClearChatRequest):
 # --- New Session Management Endpoints ---
 
 @router.get("/sessions", response_model=List[Session])
-def list_sessions(username: str, doc_id: Optional[str] = None):
-    query = supabase.table("sessions").select("*").eq("username", username)
-    if doc_id:
-        query = query.eq("doc_id", doc_id)
-    # 之前这里如果是 None 会强制查原本 null 的记录，导致有文档关联的记录查不出。
-    # 改为如果没有传入 doc_id，则返回该用户的所有会话，实现全局历史可见。
+def list_sessions(username: str, doc_id: Optional[str] = None, q: Optional[str] = None):
+    if not q:
+        query = supabase.table("sessions").select("*").eq("username", username)
+        if doc_id:
+            query = query.eq("doc_id", doc_id)
+        res = query.order("updated_at", desc=True).execute()
+        return res.data
     
-    res = query.order("updated_at", desc=True).execute()
-    return res.data
+    # 搜索逻辑
+    # 1. 搜标题
+    title_query = supabase.table("sessions").select("*").eq("username", username).ilike("title", f"%{q}%")
+    if doc_id:
+        title_query = title_query.eq("doc_id", doc_id)
+    title_res = title_query.execute()
+    
+    # 2. 搜内容 (从 chats 表中找匹配的 session_id)
+    content_query = supabase.table("chats").select("session_id").or_(f"question.ilike.%{q}%,answer.ilike.%{q}%")
+    content_res = content_query.execute()
+    
+    session_ids = set()
+    if content_res.data:
+        session_ids = {c["session_id"] for c in content_res.data if c["session_id"]}
+    
+    # 3. 合并结果
+    if session_ids:
+        # 获取这些 session_id 对应的 session (且属于当前用户)
+        id_query = supabase.table("sessions").select("*").eq("username", username).in_("id", list(session_ids))
+        if doc_id:
+            id_query = id_query.eq("doc_id", doc_id)
+        id_res = id_query.execute()
+        
+        # 合并并去重
+        combined = {s["id"]: s for s in title_res.data}
+        for s in id_res.data:
+            combined[s["id"]] = s
+            
+        # 按更新时间排序
+        results = list(combined.values())
+        results.sort(key=lambda x: x["updated_at"], reverse=True)
+        return results
+    
+    return title_res.data
 
 @router.post("/sessions", response_model=Session)
 def create_session(session_in: SessionCreate):

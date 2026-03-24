@@ -35,7 +35,7 @@ export default function ChatPage() {
   const [isPromptModalOpen, setIsPromptModalOpen] = useState(false);
 
   // Settings state - default values first
-  const [systemPrompt, setSystemPrompt] = useState('你是一个专业的智能文档助手，请用专业、准确、友好的语气回答用户的问题。');
+  const [systemPrompt, setSystemPrompt] = useState('你是一个专业的智能文档助手，请用专业、准确、友好的语气回答用户的问题，有如下要求：\n1-如果问题的答案在文档中存在，则尽量按原文内容来回答。\n2-如果答案不存在，直接回答：抱歉，未找到该问题的答案，请咨询相关同事。\n3-不要编造/臆想，严格按文档描述来！');
   const [tempSystemPrompt, setTempSystemPrompt] = useState('');
   const [selectedModelId, setSelectedModelId] = useState('');
   const [selectedDocId, setSelectedDocId] = useState('');
@@ -51,6 +51,7 @@ export default function ChatPage() {
   const isInitialMount = useRef(true);
   const isManualLoad = useRef(false);
   const [docSearchQuery, setDocSearchQuery] = useState('');
+  const [sessionSearchQuery, setSessionSearchQuery] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   // Load from localStorage on Mount safely
@@ -62,9 +63,9 @@ export default function ChatPage() {
     }
     setUsername(savedUsername);
 
-    const loadSessions = async () => {
+    const loadSessions = async (q?: string) => {
       try {
-        const cloudSessions = await apiService.listSessions(savedUsername);
+        const cloudSessions = await apiService.listSessions(savedUsername, undefined, q);
         setSessions(cloudSessions);
       } catch (err) {
         console.error("Failed to load sessions from cloud", err);
@@ -174,6 +175,20 @@ export default function ChatPage() {
   useEffect(() => {
     if (selectedModelId) localStorage.setItem('askfiles_model_id', selectedModelId);
   }, [selectedModelId]);
+
+  // Load sessions when search query changes (debounced)
+  useEffect(() => {
+    if (!username) return;
+    const timer = setTimeout(async () => {
+      try {
+        const cloudSessions = await apiService.listSessions(username, undefined, sessionSearchQuery || undefined);
+        setSessions(cloudSessions);
+      } catch (err) {
+        console.error("Failed to filter sessions", err);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [sessionSearchQuery, username]);
 
   const handleNewChat = () => {
     // 为新对话生成一个唯一的临时 ID，以确保不会加载旧的、无 Session ID 的历史记录
@@ -286,7 +301,7 @@ export default function ChatPage() {
         session_id: activeSessionId,
         username: username,
         model_id: selectedModelId,
-        system_prompt: localStorage.getItem(`system_prompt_${username}`) || undefined
+        system_prompt: systemPrompt || undefined
       };
 
       const controller = new AbortController();
@@ -497,6 +512,19 @@ export default function ChatPage() {
               <h2 className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant flex items-center gap-2">
                 <Clock className="w-3 h-3" /> 历史对话
               </h2>
+              <div className="px-2 py-0.5 bg-primary/20 text-primary text-[10px] rounded-full font-bold">{sessions.length}</div>
+            </div>
+            <div className="p-3 border-b border-white/5">
+              <div className="relative group">
+                <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 transition-colors ${sessionSearchQuery ? 'text-primary' : 'text-on-surface-variant/40'}`} />
+                <input
+                  type="text"
+                  value={sessionSearchQuery}
+                  onChange={(e) => setSessionSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 bg-black/20 border border-white/10 rounded-xl text-[10px] outline-none placeholder:text-on-surface-variant/30 focus:border-primary/50 transition-all font-medium"
+                  placeholder="搜索对话题目/内容..."
+                />
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
               {sessions.length === 0 ? (
